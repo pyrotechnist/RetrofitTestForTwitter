@@ -10,6 +10,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import okhttp3.Credentials;
 import okhttp3.Interceptor;
@@ -19,7 +21,13 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import retrofit2.Retrofit;
+import retrofit2.adapter.rxjava.RxJavaCallAdapterFactory;
 import retrofit2.converter.gson.GsonConverterFactory;
+import rx.Observable;
+import rx.android.schedulers.AndroidSchedulers;
+import rx.functions.Action1;
+import rx.functions.Func1;
+import rx.schedulers.Schedulers;
 
 public class MainActivity extends Activity {
 
@@ -53,7 +61,11 @@ public class MainActivity extends Activity {
         urlTextView = (TextView) findViewById(R.id.url_textview);
         descriptionTextView = (TextView) findViewById(R.id.description_textview);
 
-        createTwitterApi();
+        //createTwitterApi();
+
+        createTwitterApiNew();
+
+
     }
 
     private void createTwitterApi() {
@@ -79,10 +91,44 @@ public class MainActivity extends Activity {
         twitterApi = retrofit.create(TwitterApi.class);
     }
 
+    private void createTwitterApiNew(){
+
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(TwitterApi.BASE_URL)
+                .client(new OkHttpClient())
+                .addConverterFactory(GsonConverterFactory.create())
+                .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
+                .build();
+
+        twitterApi = retrofit.create(TwitterApi.class);
+
+    }
+
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.request_token_button:
-                twitterApi.postCredentials("client_credentials").enqueue(tokenCallback);
+                //twitterApi.postCredentials("client_credentials").enqueue(tokenCallback);
+                Map<String, String> map = new HashMap<>();
+                map.put("Authorization",credentials);
+                twitterApi.postCredentialsRx("client_credentials",map)
+                        .subscribeOn(Schedulers.newThread())
+                        .flatMap(new Func1<OAuthToken, Observable<UserDetails>>() {
+                            @Override
+                            public Observable<UserDetails> call(OAuthToken oAuthToken) {
+                                Map<String, String> map = new HashMap<>();
+                                token = oAuthToken;
+                                map.put("Authorization",token.getAuthorization());
+                               return twitterApi.getUserDetailsRx(usernameEditText.getText().toString(),map);
+                            }
+                        })
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(new Action1<UserDetails>() {
+                            @Override
+                            public void call(UserDetails o) {
+                                nameTextView.setText(o.getName());
+                            }
+                        });
+
                 break;
             case R.id.request_user_details_button:
                 String editTextInput = usernameEditText.getText().toString();

@@ -24,6 +24,7 @@
 
         <EditText
             android:id="@+id/username_edittext"
+            android:text="LongyuanXu"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
